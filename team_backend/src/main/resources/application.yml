@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: busCrawler
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${BUS_DB_URL:jdbc:mysql://127.0.0.1:3306/bus_crawler?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Macau}
+    username: ${DB_USER:bus_app}
+    password: ${DB_PASSWORD:}
+server:
+  address: 127.0.0.1
+  port: 11451
+  servlet:
+    context-path: /busCrawler
+    register-default-servlet: true
+macauWeb:
+  url: ${MACAU_WEB_URL:https://bis.dsat.gov.mo:37812/macauweb}
+bus:
+  refresh-on-startup:
+    enabled: ${TEAM_BACKEND_REFRESH_ON_STARTUP:false}
+  collector:
+    enabled: ${TEAM_BACKEND_COLLECTOR_ENABLED:false}

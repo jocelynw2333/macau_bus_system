@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>澳门公交 51A 实时监控</title>
+<style>
+
+.amap-container{position:absolute;inset:0;width:100%;height:100%}
+.amap-mask{position:absolute;left:15px;top:15px;z-index:20;max-width:360px;
+  background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:9px;
+  padding:10px 12px;font-size:11px;line-height:1.55;color:var(--muted);
+  box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.amap-mask strong{display:block;color:var(--text);font-size:12px;margin-bottom:3px}
+.amap-mask.ok{border-color:#bbf7d0}
+.amap-mask.warn{border-color:#fde68a}
+.amap-marker-label{border:0;background:transparent}
+.amap-stop-dot{width:12px;height:12px;background:#2563eb;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 5px #47556977}
+.amap-bus-pin{background:#172033;color:#fff;border:0;border-radius:6px;padding:5px 7px;font-size:11px;white-space:nowrap;box-shadow:0 2px 7px #17203355}
+.amap-bus-pin.estimated{background:#f59e0b;color:#172033;border:1px dashed #92400e}
+.amap-station-label{background:#fff;color:#172033;border:1px solid #dbe3ef;border-radius:5px;
+  padding:3px 6px;font-size:10px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+:root{
+  --bg:#f4f7fb;--panel:#fff;--text:#172033;--muted:#7a8497;
+  --line:#e8edf4;--blue:#2563eb;--blue2:#3b82f6;--green:#16a34a;
+  --orange:#f59e0b;--red:#ef4444;--shadow:0 4px 18px rgba(27,39,67,.07)
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI","Microsoft YaHei",Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,select{font:inherit}
+.header{height:68px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;
+  padding:0 28px;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:700}
+.logo-icon{width:38px;height:38px;border-radius:10px;background:var(--blue);color:#fff;display:grid;place-items:center;font-size:21px}
+.header-right{display:flex;align-items:center;gap:18px;color:var(--muted);font-size:13px}
+.live{display:flex;align-items:center;gap:7px;color:var(--green);font-weight:600}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(22,163,74,.12)}
+.container{padding:22px 28px 28px;max-width:1800px;margin:auto}
+.route-bar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.route-select,.direction-select{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 14px;font-size:14px}
+.route-select{min-width:220px}.direction-select{min-width:130px}
+.route-direction{background:#eaf2ff;color:var(--blue);padding:8px 13px;border-radius:8px;font-size:13px;font-weight:600}
+.update-time{margin-left:auto;color:var(--muted);font-size:12px}
+.api-status{font-size:12px;padding:7px 10px;border-radius:7px;background:#f1f5f9;color:var(--muted)}
+.api-status.ok{background:#eaf8ee;color:var(--green)}.api-status.err{background:#ffebeb;color:var(--red)}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:15px;margin-bottom:18px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:17px 19px;box-shadow:var(--shadow)}
+.kpi-label{font-size:13px;color:var(--muted);margin-bottom:9px}.kpi-value{font-size:25px;font-weight:700}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:5px}
+.dashboard{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(340px,.8fr);gap:18px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.panel-head{min-height:56px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.panel-title{font-size:15px;font-weight:700}.panel-action{font-size:12px;color:var(--blue);cursor:pointer}
+.panel-note{font-size:11px;color:var(--muted)}
+.map-wrap{height:560px;position:relative;overflow:hidden;background:#edf2f7}
+.map{position:absolute;inset:0;overflow:auto;padding:32px}
+.map-empty{height:100%;min-width:760px;display:flex;flex-direction:column;justify-content:center;align-items:center;
+  color:var(--muted);text-align:center}
+.map-empty .icon{font-size:48px;margin-bottom:12px;opacity:.65}
+.map-empty strong{color:var(--text);font-size:16px;margin-bottom:7px}
+.map-empty p{max-width:520px;line-height:1.7;margin:0;font-size:12px}
+.route-schematic{display:none;position:relative;height:100%;min-width:760px;padding:70px 45px}
+.route-track{position:absolute;left:70px;right:70px;top:50%;height:6px;background:var(--blue);border-radius:6px}
+.station-node{position:absolute;top:calc(50% - 11px);width:22px;height:22px;border-radius:50%;
+  background:var(--blue);border:4px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:2}
+.station-label{position:absolute;top:30px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11px;
+  background:#fff;padding:5px 8px;border-radius:5px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.station-index{position:absolute;top:-26px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted)}
+.schematic-bus{position:absolute;top:calc(50% - 54px);transform:translateX(-50%);background:#172033;color:#fff;
+  border-radius:6px;padding:5px 8px;font-size:10px;white-space:nowrap;z-index:3}
+.schematic-estimated{background:#f59e0b;color:#172033;border:1px dashed #92400e}
+.map-tools{position:absolute;right:15px;top:15px;display:flex;flex-direction:column;gap:5px;z-index:10}
+.map-btn{width:34px;height:34px;background:#fff;border:1px solid var(--line);border-radius:7px;font-size:18px;cursor:pointer}
+.map-btn:hover{background:#f7faff}.map-btn:disabled{opacity:.45;cursor:not-allowed}
+.map-btn.map-mode{width:48px;font-size:12px;font-weight:600}
+.map-legend{position:absolute;left:15px;bottom:15px;background:rgba(255,255,255,.94);border-radius:8px;
+  padding:9px 12px;font-size:11px;display:flex;gap:14px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+.legend-item{display:flex;align-items:center;gap:5px}.legend-dot{width:9px;height:9px;border-radius:50%;background:var(--blue)}
+.legend-bus{width:15px;height:9px;border-radius:3px;background:#172033}
+.side-content{padding:14px;max-height:504px;overflow:auto}
+.vehicle-card{padding:13px;border:1px solid var(--line);border-radius:9px;margin-bottom:10px}
+.vehicle-card:hover{border-color:#b8cdfb;background:#f8fbff}
+.vehicle-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.vehicle-id{font-weight:700;font-size:13px}.status{font-size:10px;padding:4px 7px;border-radius:10px}
+.status.arrive{background:#eaf8ee;color:var(--green)}.status.depart{background:#eaf2ff;color:var(--blue)}
+.status.unknown{background:#f1f5f9;color:var(--muted)}
+.vehicle-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:var(--muted)}
+.vehicle-grid strong{display:block;color:var(--text);font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vehicle-location{margin-top:9px;padding-top:8px;border-top:1px solid var(--line);font-size:11px;color:#92400e;line-height:1.5}
+.bottom-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-top:18px}
+.table-wrap{padding:0 15px 15px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;color:var(--muted);font-weight:500;padding:12px 8px;border-bottom:1px solid var(--line)}
+td{padding:12px 8px;border-bottom:1px solid #f0f2f6}
+.badge{padding:4px 7px;border-radius:5px;font-size:10px}
+.normal{background:#eaf8ee;color:var(--green)}.busy{background:#fff5df;color:#c47b00}.major{background:#ffebeb;color:var(--red)}
+.empty{color:var(--muted);text-align:center;padding:30px 10px!important}
+.info-list{padding:10px 18px 16px}
+.info-row{display:grid;grid-template-columns:150px 1fr;gap:12px;min-height:42px;align-items:center;border-bottom:1px solid #f0f2f6;font-size:12px}
+.info-row:last-child{border:0}.info-key{color:var(--muted)}.info-value{font-weight:600}
+.notice{margin:14px 18px;padding:11px 12px;border-radius:8px;background:#f8fafc;color:var(--muted);font-size:11px;line-height:1.6}
+.loading{opacity:.6;pointer-events:none}
+.error-box{margin:0 0 18px;padding:12px 14px;border:1px solid #fecaca;background:#fff1f2;color:#b91c1c;border-radius:9px;font-size:12px;display:none}
+.error-box.show{display:block}
+.map-wrap:fullscreen{width:100vw;height:100vh;border-radius:0}
+.map-wrap:fullscreen .map-tools{right:24px;top:24px}
+.map-wrap:fullscreen .map-legend{left:24px;bottom:24px}
+.map-wrap:fullscreen .map-btn{width:40px;height:40px;font-size:21px}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.dashboard{grid-template-columns:1fr}.bottom-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.header{padding:0 15px}.container{padding:15px}.kpis{grid-template-columns:repeat(2,1fr)}
+.update-time{display:none}.map-wrap{height:430px}.header-right{gap:8px}.header-right .admin{display:none}}
+.estimate{padding:14px 18px;border-top:1px solid var(--line)}
+.estimate label{display:block;font-size:12px;font-weight:600;margin-bottom:9px}
+.estimate select{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.estimate p{font-size:13px;line-height:1.6;margin:11px 0}
+.estimate small{display:block;color:var(--muted);line-height:1.5}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="logo"><div class="logo-icon">🚌</div><span>澳门公交 51A 实时监控</span></div>
+  <div class="header-right">
+    <div class="live"><i class="live-dot"></i>实时数据</div>
+    <span id="clock"></span><span class="admin">方向 0</span>
+  </div>
+</header>
+
+<main class="container" id="page">
+  <div class="route-bar">
+    <select class="route-select" id="routeSelect" aria-label="线路" disabled><option>51A</option></select>
+    <select class="direction-select" id="directionSelect" aria-label="方向" disabled><option value="0">方向 0</option></select>
+    <div class="route-direction" id="routeDirection">● 51A · 方向 0</div>
+    <div class="api-status" id="apiStatus">正在连接后端</div>
+    <div class="update-time">最后更新：<span id="lastUpdate">--</span></div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <section class="kpis">
+    <div class="kpi"><div class="kpi-label">车辆记录</div><div class="kpi-value" id="kpiBus">--</div><div class="kpi-sub">最近一次采样的车辆记录</div></div>
+    <div class="kpi"><div class="kpi-label">站点</div><div class="kpi-value" id="kpiStation">--</div><div class="kpi-sub">51A 方向 0 的站点数量</div></div>
+    <div class="kpi"><div class="kpi-label">所选站点事件</div><div class="kpi-value" id="kpiEvents">--</div><div class="kpi-sub">最近 20 条入站／出站事件</div></div>
+    <div class="kpi"><div class="kpi-label">平均车速</div><div class="kpi-value" id="kpiSpeed">--</div><div class="kpi-sub">本次采样，单位 km/h</div></div>
+    <div class="kpi"><div class="kpi-label">最新采集</div><div class="kpi-value" id="kpiFreshness">--</div><div class="kpi-sub">以数据库中最新快照为准</div></div>
+  </section>
+
+  <section class="dashboard">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">线路与车辆位置</div>
+        <div class="panel-action" id="fullscreenBtn">全屏</div>
+      </div>
+      <div class="map-wrap" id="mapWrap">
+        <div id="mapFallback" class="map"><div id="mapEmpty" class="map-empty">正在读取线路数据……</div><div id="routeSchematic" class="route-schematic"></div></div>
+        <div id="amapContainer" class="amap-container" hidden></div>
+
+        <div class="amap-mask" id="amapStatus">
+          <strong>高德地图</strong>
+          正在加载地图……
+        </div>
+
+        <div class="map-tools">
+          <button class="map-btn map-mode" id="mapModeBtn" title="切换地图与线路示意" disabled>地图</button>
+          <button class="map-btn" id="zoomInBtn" title="放大">＋</button>
+          <button class="map-btn" id="zoomOutBtn" title="缩小">−</button>
+          <button class="map-btn" id="resetMapBtn" title="重置到澳门">⌖</button>
+        </div>
+
+        <div class="map-legend"><div class="legend-item"><i class="legend-bus"></i><span id="mapLegendText">按站序排列的线路示意</span></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">运行车辆</div>
+        <div class="panel-note" id="vehicleCountText">-- 辆</div>
+      </div>
+      <div class="side-content" id="vehicleList">
+        <div class="empty">等待接口数据...</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="bottom-grid">
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">站点实时状态</div><div class="panel-note">按线路站点顺序</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>序号</th><th>站点</th><th>站点编号</th><th>报站状态</th><th>载客字段原值</th><th>记录</th></tr></thead>
+          <tbody id="stationTable"><tr><td colspan="6" class="empty">等待接口数据...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">线路与到站估计</div><div class="panel-note">基于历史入站事件</div></div>
+      <div class="info-list" id="routeInfo">
+        <div class="info-row"><span class="info-key">线路名称</span><span class="info-value">--</span></div>
+        <div class="info-row"><span class="info-key">线路编码</span><span class="info-value">--</span></div>
+        <div class="info-row"><span class="info-key">方向</span><span class="info-value">--</span></div>
+        <div class="info-row"><span class="info-key">线路变更</span><span class="info-value">--</span></div>
+        <div class="info-row"><span class="info-key">站点数</span><span class="info-value">--</span></div>
+      </div>
+      <div class="estimate"><label for="stationSelect">选择站点，查看下一班可能到达的时间范围</label><select id="stationSelect" aria-label="估计站点"><option value="">正在读取站点……</option></select><p id="arrivalWindow">正在读取历史入站事件……</p><small>估计来自近 14 天的采样记录，并非官方到站承诺。请在最早预计时间前到站。</small></div>
+      <div class="notice">站点和道路来自澳门政府开放数据。入站车标固定在站点；出站高亮两站之间的道路。橙色车标按历史行程时间推算，不是实时 GPS；样本不足或数据过旧时不显示具体车标。点击地图右侧“线路”可看站序示意。</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">所选站点入站／出站事件</div><div class="panel-note">最近 20 条</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>采样时间</th><th>车辆</th><th>站点编号</th><th>事件</th><th>依据</th></tr></thead>
+          <tbody id="eventTable"><tr><td colspan="5" class="empty">暂无状态变化记录</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">数据来源</div><div class="panel-note">当前运行版本</div></div>
+      <div class="info-list">
+        <div class="info-row"><span class="info-key">最新快照</span><span class="info-value">GET /api/routes/51A/latest</span></div>
+        <div class="info-row"><span class="info-key">入出站事件</span><span class="info-value">GET /api/routes/51A/stations/{站点}/events</span></div>
+        <div class="info-row"><span class="info-key">到站范围</span><span class="info-value">GET /api/routes/51A/stations/{站点}/arrival-window</span></div>
+        <div class="info-row"><span class="info-key">刷新间隔</span><span class="info-value">10 秒</span></div>
+        <div class="info-row"><span class="info-key">地图服务</span><span class="info-value">高德地图 JS API 2.0（本机配置）</span></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/static/dashboard.js" defer></script>
+</body>
+</html>

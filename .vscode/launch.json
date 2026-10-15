@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "51A 采集器",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/collector.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "JSONL 导入 MySQL",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/importer.py",
+      "args": ["--follow"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "网页后端",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["api:app", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}
