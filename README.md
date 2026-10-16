@@ -12,13 +12,13 @@
 
 ## 组员的工作
 
-| 人员 | 负责的内容 | 在本项目中的连接 |
+| 负责的内容 | 在本项目中的连接 |
 | --- | --- | --- |
-| 你 | 51A 动态采集 | `collector.py` 和正则提取模块 `regex_extract.py` |
-| Y | 站点数据、前端 | 她的仪表盘已整合为 `static/index.html` 和 `static/dashboard.js`；`station_info` 存站名 |
-| K | MySQL 数据库 | `team_schema.sql` 来自其原 SQL；`schema_extension.sql` 增加历史表 |
-| L | 可视化 | 使用 `bus_station_event`、`bus_observation` 或查询 API |
-| A | Java 后端 | [GitHub 源码](https://github.com/ZGLH2S/MacaoBusCrawler) 已放入 `team_backend/`；提供兼容的只读最新快照接口，见 [团队整合说明](docs/TEAM_INTEGRATION.md) |
+| 51A 动态采集 | `collector.py` 和正则提取模块 `regex_extract.py` |
+| 站点数据、前端 | 她的仪表盘已整合为 `static/index.html` 和 `static/dashboard.js`；`station_info` 存站名 |
+| MySQL 数据库 | `team_schema.sql` 来自其原 SQL；`schema_extension.sql` 增加历史表 |
+| 可视化 | 使用 `bus_station_event`、`bus_observation` 或查询 API |
+| Java 后端 | [GitHub 源码](https://github.com/ZGLH2S/MacaoBusCrawler) 已放入 `team_backend/`；提供兼容的只读最新快照接口，见 [团队整合说明](docs/TEAM_INTEGRATION.md) |
 
 原始 `bus_crawler(1).sql` 含有删除表的语句，采集开始后不要再执行它。仓库的 `team_schema.sql` 删除了这些语句，适合新成员首次建库。`importer.py` 将入站/出站事件同步写到组员的 `station_bus_info`，`sync_catalog.py` 把 51A 站点顺序写到组员的线路/站点表。
 
@@ -39,7 +39,7 @@ Y 的原页面请求 A 的 Java 后端 `localhost:4399/busCrawler`。整合后�
 
 不要让两个采集器同时写同一个 JSONL。浏览器打开 <http://127.0.0.1:8000/>，确认最新采集时间持续变化；选择站点可看事件与估计范围。`./stop_all.command` 只会停止由启动脚本记录的进程。
 
-## 接入 A 的 Java 后端
+## 接入的 Java 后端
 
 Java 源码已放进 `team_backend/`，需要 Java 21 才能运行。它默认只读现有 MySQL 历史数据，**不会启动第二个 51A 定时采集器**。确认 `.env` 中仍是当前数据库账号后，在项目根目录运行 `./start_team_backend.command`；Java 服务的健康接口是 <http://127.0.0.1:11451/busCrawler/api/team/health>。在 `.env` 增加 `TEAM_BACKEND_URL=http://127.0.0.1:11451/busCrawler` 后，运行 `./restart_web.command`，网页的“最新快照”查询将通过本项目 API 优先使用 Java；Java 临时停止时会自动使用原 Python 查询，不会影响采集。访问 <http://127.0.0.1:8000/api/backend/status> 可确认实际使用哪个后端。本机若已有旧版 Java 和网页进程，运行 `./finish_backend_switch.command` 即可依次重启这两个服务，采集器和导入器保持运行。
 
@@ -73,7 +73,7 @@ mysql -u 你的数据库账号 -p bus_crawler < schema_extension.sql
 
 ## 时间含义
 
-组员 SQL 把状态 `1` 写为入站，`0` 写为出站。事件时间是第一次采样看到该状态的时间，不等于车门开关的精确时刻；`first_seen` 表示上一状态未被连续观测。到站范围用近 14 天同站点、相近时段历史间隔的 10%—90% 分位计算，样本少或最新记录过旧时不显示。站间行程时间另按同一车辆在相邻站的出站→入站事件配对计算，供地图推算使用，不等于到站预测。页面建议在估计最早时间前 2 分钟到站，不能保证赶上具体车辆。
+SQL 把状态 `1` 写为入站，`0` 写为出站。事件时间是第一次采样看到该状态的时间，不等于车门开关的精确时刻；`first_seen` 表示上一状态未被连续观测。到站范围用近 14 天同站点、相近时段历史间隔的 10%—90% 分位计算，样本少或最新记录过旧时不显示。站间行程时间另按同一车辆在相邻站的出站→入站事件配对计算，供地图推算使用，不等于到站预测。页面建议在估计最早时间前 2 分钟到站，不能保证赶上具体车辆。
 
 持续两周采集时保持 Mac 开机、联网、登录且不要合盖；每天检查网页最新采集时间，并备份 JSONL 和数据库。
 
