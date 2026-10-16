@@ -13,7 +13,7 @@
 ## 组员的工作
 
 | 负责的内容 | 在本项目中的连接 |
-| --- | --- | --- |
+| --- | --- |
 | 51A 动态采集 | `collector.py` 和正则提取模块 `regex_extract.py` |
 | 站点数据、前端 | 她的仪表盘已整合为 `static/index.html` 和 `static/dashboard.js`；`station_info` 存站名 |
 | MySQL 数据库 | `team_schema.sql` 来自其原 SQL；`schema_extension.sql` 增加历史表 |
