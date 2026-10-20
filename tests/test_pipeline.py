@@ -2,13 +2,31 @@ import json
 import unittest
 from datetime import datetime, timedelta
 
-from arrival_estimate import estimate_window
+from arrival_estimate import estimate_window, estimate_window_with_reason
 from events import classify_event
 from regex_extract import extract_bus_response
 from segment_time import summarize_segments
 
 
 class PipelineTest(unittest.TestCase):
+    def test_station_routes_accept_slash_in_station_code(self):
+        from pathlib import Path
+        from starlette.routing import Match
+        from api import app
+
+        geo_path = Path(__file__).resolve().parents[1] / "static" / "route-51a.geo.json"
+        codes = [station["code"] for station in json.loads(geo_path.read_text())["stations"]]
+        for suffix in ("events", "arrival-window"):
+            for code in codes:
+                scope = {
+                    "type": "http", "method": "GET",
+                    "path": f"/api/routes/51A/stations/{code}/{suffix}",
+                }
+                matches = [params["path_params"]["sta_code"] for route in app.routes
+                           for match, params in [route.matches(scope)]
+                           if match == Match.FULL]
+                self.assertEqual(matches, [code])
+
     def test_regex_extraction_keeps_existing_record_contract(self):
         response = {
             "data": {
@@ -56,6 +74,20 @@ class PipelineTest(unittest.TestCase):
         self.assertLess(result["earliest"], result["latest"] + timedelta(seconds=1))
         self.assertEqual(result["arrive_by"], result["earliest"] - timedelta(minutes=2))
         self.assertIsNone(estimate_window(arrivals[:-3], now + timedelta(hours=2)))
+
+    def test_unavailable_estimate_explains_the_actual_gap(self):
+        now = datetime(2026, 10, 20, 9, 0)
+        self.assertIn("今天尚未", estimate_window_with_reason([], now)[1])
+        stale = [now.replace(hour=7, minute=20)]
+        self.assertIn("超过 90 分钟", estimate_window_with_reason(stale, now)[1])
+        recent = [now.replace(hour=8, minute=50)]
+        self.assertIn("至少需要 5 组", estimate_window_with_reason(recent, now)[1])
+        arrivals = []
+        for day in range(7):
+            base = now - timedelta(days=day)
+            arrivals.extend([base.replace(hour=7, minute=50), base.replace(hour=8, minute=0),
+                             base.replace(hour=8, minute=10)])
+        self.assertIn("时间范围已过去", estimate_window_with_reason(arrivals, now)[1])
 
     def test_segment_time_only_pairs_adjacent_stops_in_same_bus_trip(self):
         base = datetime(2026, 10, 15, 9, 0)

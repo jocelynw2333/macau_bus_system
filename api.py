@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from arrival_estimate import estimate_window
+from arrival_estimate import estimate_window_with_reason
 from segment_time import summarize_segments
 
 load_dotenv()
@@ -185,7 +185,7 @@ def history(limit: int = 100):
     return rows
 
 
-@app.get("/api/routes/51A/stations/{sta_code}/events")
+@app.get("/api/routes/51A/stations/{sta_code:path}/events")
 def station_events(sta_code: str, limit: int = 100):
     limit = min(max(limit, 1), 500)
     rows = query(
@@ -202,7 +202,7 @@ def station_events(sta_code: str, limit: int = 100):
     return rows
 
 
-@app.get("/api/routes/51A/stations/{sta_code}/arrival-window")
+@app.get("/api/routes/51A/stations/{sta_code:path}/arrival-window")
 def arrival_window(sta_code: str):
     now = datetime.now(ZoneInfo("Asia/Macau")).replace(tzinfo=None)
     rows = query(
@@ -214,11 +214,11 @@ def arrival_window(sta_code: str):
         """,
         (sta_code, now - timedelta(days=14), now),
     )
-    estimate = estimate_window([row["observed_at"] for row in rows], now)
+    estimate, reason = estimate_window_with_reason([row["observed_at"] for row in rows], now)
     if estimate is None:
         return {
             "station": sta_code, "available": False,
-            "reason": "同站点近期到车记录不足，暂时无法可靠估计。",
+            "reason": reason,
         }
     return {
         "station": sta_code, "available": True,
