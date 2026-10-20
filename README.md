@@ -7,7 +7,7 @@
 | `bus_51a_live.py` | `collector.py`、`regex_extract.py` | 正则提取；格式不变；超时刷新 |
 | `51A_live.jsonl` | `data/51A_live.jsonl` | 保存采集数据，由 `importer.py` 入库 |
 | `bus_crawler(1).sql` | `team_schema.sql`、`schema_extension.sql` | 移除删表语句；新增历史与事件表 |
-| `一键启动(2)/` | `start_team_backend.command` | 改为源码构建并启动 |
+| `一键启动(2)` | `start_team_backend.command` | 改为源码构建并启动 |
 | [MacaoBusCrawler 源码](https://github.com/ZGLH2S/MacaoBusCrawler) | `team_backend/` | 新增只读接口；关闭重复采集 |
 | `index_bus_api_connected_amap(1).html` | `static/index.html`、`static/dashboard.js` | 接入本地数据、地图和到站估计 |
 
