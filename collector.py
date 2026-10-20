@@ -29,6 +29,7 @@ async def main():
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     stopping = asyncio.Event()
     last_success = time.monotonic()
+    last_recovery = last_success
     tasks = set()
 
     def request_stop():
@@ -113,9 +114,14 @@ async def main():
                     await asyncio.wait_for(stopping.wait(), timeout=5)
                 except asyncio.TimeoutError:
                     pass
-                if time.monotonic() - last_success > 120:
-                    print("超过两分钟没有有效数据，请检查网页和网络。", flush=True)
-                    last_success = time.monotonic()
+                now = time.monotonic()
+                if now - last_success > 120 and now - last_recovery > 120:
+                    last_recovery = now
+                    print("超过两分钟没有有效数据，正在刷新公交网页。", flush=True)
+                    try:
+                        await page.reload(wait_until="domcontentloaded", timeout=60000)
+                    except Error as exc:
+                        print(f"网页刷新失败，稍后重试：{exc}", flush=True)
         finally:
             page.remove_listener("response", on_response)
             if tasks:

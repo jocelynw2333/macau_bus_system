@@ -22,6 +22,10 @@ for name in collector importer web; do
       echo "$name 已在运行（PID $pid）。请勿重复启动。"
       exit 1
     fi
+    if [[ -z "$command_line" ]] && lsof -t -p "$pid" >/dev/null 2>&1; then
+      echo "无法核实 $name 的进程（PID $pid），但它仍存在。为避免重复启动，已保留 PID 记录。"
+      exit 1
+    fi
     rm -f "$pid_file"
   fi
 done

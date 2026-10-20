@@ -38,6 +38,16 @@ def first_value(source, *names):
     return None
 
 
+def read_complete_line(file):
+    """Wait for the collector to finish appending a JSONL record."""
+    position = file.tell()
+    line = file.readline()
+    if not line or not line.endswith(b"\n"):
+        file.seek(position)
+        return None
+    return line
+
+
 def insert_record(connection, record):
     route = str(record.get("route", "51A"))
     direction = int(record.get("direction", 0))
@@ -191,14 +201,16 @@ def run(path, follow):
                 time.sleep(2)
                 continue
 
-            with path.open("r", encoding="utf-8") as file:
+            # Binary offsets remain exact even if a UTF-8 character is still
+            # being appended when the importer reaches the end of the file.
+            with path.open("rb") as file:
                 if offset > path.stat().st_size:
                     offset = 0
                 file.seek(offset)
                 while True:
                     position = file.tell()
-                    line = file.readline()
-                    if not line:
+                    line = read_complete_line(file)
+                    if line is None:
                         offset = position
                         break
                     try:

@@ -14,6 +14,9 @@ for name in collector importer web caffeinate; do
     if [[ "$command_line" == *"$expected"* ]]; then
       kill "$pid"
       echo "已停止 $name（PID $pid）"
+    elif [[ -z "$command_line" ]] && lsof -t -p "$pid" >/dev/null 2>&1; then
+      echo "无法核实 $name 的进程（PID $pid），已保留 PID 记录，请在本机终端检查。"
+      continue
     fi
     rm -f "$pid_file"
   fi

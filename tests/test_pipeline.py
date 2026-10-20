@@ -1,6 +1,8 @@
 import json
+import tempfile
 import unittest
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from arrival_estimate import estimate_window, estimate_window_with_reason
 from events import classify_event
@@ -46,6 +48,20 @@ class PipelineTest(unittest.TestCase):
         }
         raw = json.dumps(response, ensure_ascii=False, separators=(",", ":"))
         self.assertEqual(extract_bus_response(raw), response)
+
+    def test_importer_waits_for_complete_jsonl_record(self):
+        from importer import read_complete_line
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "live.jsonl"
+            path.write_text('{"collected_at": "2026-10-20T09:00:', encoding="utf-8")
+            with path.open("rb") as file:
+                self.assertIsNone(read_complete_line(file))
+                self.assertEqual(file.tell(), 0)
+                with path.open("a", encoding="utf-8") as writer:
+                    writer.write('00+08:00"}\n')
+                record = json.loads(read_complete_line(file))
+                self.assertEqual(record["collected_at"], "2026-10-20T09:00:00+08:00")
 
     def test_first_seen_and_transition_are_distinct(self):
         now = datetime(2026, 10, 15, 10, 0)
